@@ -362,7 +362,7 @@ function buildFeed(){
 }
 
 /* ---------- state ---------- */
-let role='human', me={n:'Subhan',loc:'Karachi, PK',ai:0}, currentAgent=null, feedCache=null;
+let role='human', me={n:'Subhan',loc:'Karachi, PK',ai:0,rate:0,rev:0,biz:'',skills:[],posts:[],reviews:[]}, currentAgent=null, feedCache=null;
 
 /* ---------- navigation ---------- */
 function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -386,7 +386,11 @@ function finishOnboard(){
   me.n=document.getElementById('ob-name').value.trim()||'Subhan';
   me.one=document.getElementById('ob-one').value.trim()||'New to evolution';
   me.loc=document.getElementById('ob-loc').value.trim()||'Karachi, PK';
+  me.skills=document.getElementById('ob-skills').value.split(',').map(s=>s.trim()).filter(Boolean);
   me.ai=(role==='agent')?1:0;
+  // Add the newly registered agent into the live agents list so they appear in the
+  // Agents tab and their profile can be opened without crashing.
+  if(me.ai&&!agents.some(a=>a===me))agents.push(me);
   enterApp();
 }
 function enterApp(){go('s-app');switchTab('feed',document.querySelector('.nav button'));}
@@ -478,7 +482,7 @@ function renderMe(){
     <div class="pad" style="padding-top:0">
       <button class="btn btn-ghost" onclick="toast('Profile editing coming soon')">Edit profile</button>
       <div class="sec" style="margin-top:22px">Your posts</div>
-      ${me.posts?me.posts.map(p=>postCard(me,p,false)).join(''):'<p class="mut" style="font-size:14px">Nothing yet — tap + to post.</p>'}
+      ${me.posts&&me.posts.length?me.posts.map(p=>postCard(me,p,false)).join(''):' <p class="mut" style="font-size:14px">Nothing yet — tap + to post.</p>'}
       <button class="btn btn-ghost" style="margin-top:18px" onclick="logout()">Log out</button>
     </div>`;
 }
@@ -486,25 +490,29 @@ function logout(){feedCache=null;go('s-welcome');}
 
 /* ---------- agent profile ---------- */
 function openProfile(name){
-  const a=agents.find(x=>x.n===name);currentAgent=a;
-  const reviews=a.reviews.map(r=>`<div class="review"><div class="rh"><span class="who">${r[0]}</span>
+  // Look up in seeded agents first; fall back to the currently logged-in user so
+  // clicking your own posts / your agent card never crashes.
+  const a=agents.find(x=>x.n===name)||(me.n===name?me:null);
+  if(!a)return;
+  currentAgent=a;
+  const reviews=(a.reviews||[]).map(r=>`<div class="review"><div class="rh"><span class="who">${r[0]}</span>
     <span class="chip" style="margin:0">${r[1]}</span></div><p>${r[2]}</p></div>`).join('')||'<p class="mut" style="font-size:13px">No reviews yet.</p>';
-  const posts=a.posts.map(p=>postCard(a,p,false)).join('');
+  const posts=(a.posts||[]).map(p=>postCard(a,p,false)).join('')||'<p class="mut" style="font-size:13px">No posts yet.</p>';
   const stats=a.ai?`<div class="stats">
-      <div class="stat"><div class="v">★ ${a.rate}</div><div class="l">RATING /10</div></div>
-      <div class="stat"><div class="v">${a.rev}</div><div class="l">REVIEWS</div></div>
-      <div class="stat"><div class="v">${a.biz}</div><div class="l">BIZ GENERATED</div></div>
+      <div class="stat"><div class="v">★ ${a.rate||0}</div><div class="l">RATING /10</div></div>
+      <div class="stat"><div class="v">${a.rev||0}</div><div class="l">REVIEWS</div></div>
+      <div class="stat"><div class="v">${a.biz||'—'}</div><div class="l">BIZ GENERATED</div></div>
     </div>`:'';
   document.getElementById('profile-body').innerHTML=`
     <div class="phero">
       ${av(a,90)}
       <h2 style="margin:12px 0 0;font-size:23px;display:flex;gap:8px;justify-content:center;align-items:center">${a.n} ${badge(a)}</h2>
-      <div class="one">${a.one}</div>
-      <div class="mut" style="font-size:12.5px;margin-top:6px">📍 ${a.loc}</div>
+      <div class="one">${a.one||''}</div>
+      <div class="mut" style="font-size:12.5px;margin-top:6px">📍 ${a.loc||''}</div>
     </div>
     <div class="pad" style="padding-top:0">
       ${stats}
-      ${a.ai?`<button class="btn btn-primary" onclick="startChat()">Hire me!</button>`:''}
+      ${a.ai&&a!==me?`<button class="btn btn-primary" onclick="startChat()">Hire me!</button>`:''}
       <div class="sec" style="margin-top:24px">Reviews</div>${reviews}
       <div class="sec" style="margin-top:20px">Posts</div>${posts}
     </div>`;
